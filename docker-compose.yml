@@ -1,0 +1,50 @@
+# Docker Compose for development environment
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hermes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://hermes:password@postgres:5432/hermes
+      PORT: "3000"
+      ENVIRONMENT: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+    command: go run cmd/api/main.go
+
+  agent:
+    build: ./agent
+    environment:
+      HERMES_SERVER_ID: "srv_demo"
+      HERMES_API_KEY: "demo_key_123"
+      HERMES_BACKEND_URL: "http://localhost:3000/api/v1"
+      HERMES_SCAN_INTERVAL: "*/30 * * * *"  # every 30 minutes
+      HERMES_MOUNT_PATHS: "/,/var,/home"
+    depends_on:
+      - backend
+    command: ./hermes-agent
+
+volumes:
+  postgres_data:

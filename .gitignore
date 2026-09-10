@@ -1,0 +1,54 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+vendor/
+*.sum
+
+# Agent binary
+agent/hermes-agent
+backend/hermes-backend
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Node (dashboard)
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Testing
+coverage.txt
+*.test
+
+# Temporary
+tmp/
+temp/
