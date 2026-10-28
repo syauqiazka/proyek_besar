@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/hermes/backend/internal/db"
+	"github.com/archon/backend/internal/db"
 )
 
 type ApiKeyHandler struct {

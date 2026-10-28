@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hermes/backend/internal/db"
+	"github.com/archon/backend/internal/db"
 )
 
 type AgentHandler struct {
@@ -112,7 +112,7 @@ func (h *AgentHandler) Register(c *fiber.Ctx) error {
 	// Generate API key random 32 hex
 	keyBytes := make([]byte, 32)
 	_, _ = rand.Read(keyBytes)
-	apiKey := "hermes_" + hex.EncodeToString(keyBytes)
+	apiKey := "archon_" + hex.EncodeToString(keyBytes)
 
 	_, err = h.db.DB.Exec(`
 		INSERT INTO agent_api_keys (server_id, api_key)
@@ -121,7 +121,7 @@ func (h *AgentHandler) Register(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create API key", "detail": err.Error()})
 	}
 
-	// Generate deploy package folder deploy/<hostname>/ berisi .env dan hermes-agent.env
+	// Generate deploy package folder deploy/<hostname>/ berisi .env dan archon-agent.env
 	deployPath, _ := createDeployPackage(req.Hostname, serverID, apiKey)
 
 	return c.Status(201).JSON(fiber.Map{
@@ -194,7 +194,7 @@ func createDeployPackage(hostname, serverID, apiKey string) (string, error) {
 		return "", err
 	}
 
-	backendURL := os.Getenv("HERMES_BACKEND_URL")
+	backendURL := os.Getenv("ARCHON_BACKEND_URL")
 	if backendURL == "" {
 		// Auto-detect LAN IP agar agent bisa konek dari server lain
 		localIP := getLocalIP()
@@ -204,27 +204,27 @@ func createDeployPackage(hostname, serverID, apiKey string) (string, error) {
 	backendURL = strings.TrimSuffix(backendURL, "/api/v1")
 	backendURL = backendURL + "/api/v1"
 
-	envContent := fmt.Sprintf(`# Hermes Agent Configuration for: %s
-HERMES_SERVER_ID=%s
-HERMES_API_KEY=%s
-HERMES_BACKEND_URL=%s
-HERMES_SCAN_INTERVAL=*/5 * * * *
-HERMES_MOUNT_PATHS=/,/home
+	envContent := fmt.Sprintf(`# Archon Agent Configuration for: %s
+ARCHON_SERVER_ID=%s
+ARCHON_API_KEY=%s
+ARCHON_BACKEND_URL=%s
+ARCHON_SCAN_INTERVAL=*/5 * * * *
+ARCHON_MOUNT_PATHS=/,/home
 `, hostname, serverID, apiKey, backendURL)
 
-	// Buat kedua file: .env dan hermes-agent.env agar kompatibel dengan tutorial & skrip
+	// Buat kedua file: .env dan archon-agent.env agar kompatibel dengan tutorial & skrip
 	_ = os.WriteFile(filepath.Join(deployDir, ".env"), []byte(envContent), 0644)
-	_ = os.WriteFile(filepath.Join(deployDir, "hermes-agent.env"), []byte(envContent), 0644)
+	_ = os.WriteFile(filepath.Join(deployDir, "archon-agent.env"), []byte(envContent), 0644)
 
 	// Copy binary agent jika ada
-	agentSrc := filepath.Join(rootDir, "agent", "hermes-agent")
+	agentSrc := filepath.Join(rootDir, "agent", "archon-agent")
 	if info, err := os.Stat(agentSrc); err == nil && !info.IsDir() {
-		_ = copyFile(agentSrc, filepath.Join(deployDir, "hermes-agent"))
+		_ = copyFile(agentSrc, filepath.Join(deployDir, "archon-agent"))
 	}
 
 	// Copy script helper linux jika ada
 	linuxSrc := filepath.Join(rootDir, "deploy", "linux")
-	scripts := []string{"start-agent.sh", "stop-agent.sh", "status-agent.sh", "install-agent-service.sh", "hermes-agent.service"}
+	scripts := []string{"start-agent.sh", "stop-agent.sh", "status-agent.sh", "install-agent-service.sh", "archon-agent.service"}
 	for _, s := range scripts {
 		srcPath := filepath.Join(linuxSrc, s)
 		if info, err := os.Stat(srcPath); err == nil && !info.IsDir() {
@@ -253,7 +253,7 @@ func copyFile(src, dst string) error {
 }
 
 // getLocalIP mengembalikan IP LAN pertama yang ditemukan (bukan loopback)
-// Dipakai untuk mengisi HERMES_BACKEND_URL di file .env deploy package.
+// Dipakai untuk mengisi ARCHON_BACKEND_URL di file .env deploy package.
 func getLocalIP() string {
 	// Coba konek ke DNS publik untuk menentukan interface yang aktif
 	conn, err := net.Dial("udp", "8.8.8.8:80")

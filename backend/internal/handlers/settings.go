@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hermes/backend/internal/notify"
+	"github.com/archon/backend/internal/notify"
 )
 
 type SettingsHandler struct {

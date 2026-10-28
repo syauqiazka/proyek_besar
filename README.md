@@ -1,6 +1,6 @@
-# Hermes — Monitoring Storage yang Menjaga Server Kamu
+# Archon — Monitoring Storage yang Menjaga Server Kamu
 
-Hermes adalah sistem yang **mengawasi kapasitas penyimpanan (storage) server** secara otomatis. Dia memberi tahu kamu sebelum server penuh, memperkirakan kapan server akan penuh, dan membantu membersihkan file sampah dengan aman.
+Archon adalah sistem yang **mengawasi kapasitas penyimpanan (storage) server** secara otomatis. Dia memberi tahu kamu sebelum server penuh, memperkirakan kapan server akan penuh, dan membantu membersihkan file sampah dengan aman.
 
 Dibuat khusus untuk UMKM, digital agency, dan pemilik toko online Indonesia yang **tidak punya tim IT khusus**.
 
@@ -8,11 +8,11 @@ Dibuat khusus untuk UMKM, digital agency, dan pemilik toko online Indonesia yang
 
 ---
 
-## 1. Apa Itu Hermes? (Penjelasan Sederhana)
+## 1. Apa Itu Archon? (Penjelasan Sederhana)
 
 Bayangkan server seperti **gudang penyimpanan**. Kalau gudang penuh, barang baru tidak bisa masuk, website bisa down, dan bisnis berhenti.
 
-Hermes bekerja seperti **satpam gudang yang pintar**:
+Archon bekerja seperti **satpam gudang yang pintar**:
 - 🛎️ **Memantau** — tahu berapa banyak ruang gudang yang terpakai setiap saat
 - 🔮 **Memprediksi** — memperkirakan "gudang ini bakal penuh dalam 15 hari"
 - 🧹 **Membantu bersih-bersih** — menemukan file sampah seperti log lama, file backup ganda, file sementara
@@ -21,12 +21,12 @@ Hermes bekerja seperti **satpam gudang yang pintar**:
 
 ---
 
-## 2. Bagian-Bagian Hermes
+## 2. Bagian-Bagian Archon
 
 | Bagian | Namanya | Fungsinya | Analogi |
 |---|---|---|---|
-| **Agent** | `hermes-agent` | Dipasang DI DALAM server yang dipantau. Tugasnya scan disk dan lapor. | Satpam yang stand by di dalam gudang |
-| **Backend** | `hermes-backend.exe` | Pusat data. Menerima laporan semua agent, menyimpan ke database, menghitung prediksi. | Kantor pusat pengelolaan |
+| **Agent** | `archon-agent` | Dipasang DI DALAM server yang dipantau. Tugasnya scan disk dan lapor. | Satpam yang stand by di dalam gudang |
+| **Backend** | `archon-backend.exe` | Pusat data. Menerima laporan semua agent, menyimpan ke database, menghitung prediksi. | Kantor pusat pengelolaan |
 | **Dashboard** | Website (Next.js) | Tampilan di browser untuk melihat semua server dalam satu layar. | Layar monitor CCTV |
 | **Database** | Supabase (PostgreSQL) | Tempat penyimpanan semua data, di cloud (online). | Buku catatan besar di cloud |
 
@@ -59,7 +59,7 @@ cd C:\Users\PC05\Documents\M.SyauqiAzka\proyek_besar
 ```bash
 cd backend
 go mod tidy
-go build -o hermes-backend.exe cmd/api/main.go
+go build -o archon-backend.exe cmd/api/main.go
 cd ..
 ```
 
@@ -74,7 +74,7 @@ cd ..
 ### 4c. Buat Akun Supabase (Database Cloud)
 
 1. Buka https://supabase.com/ → klik **Start your project** → daftar gratis
-2. Buat project baru, beri nama apa saja (misal `hermes`)
+2. Buat project baru, beri nama apa saja (misal `archon`)
 3. Ingat **password database** yang kamu buat (simpan baik-baik!)
 4. Tunggu sampai project jadi (~2 menit)
 
@@ -116,7 +116,7 @@ ENVIRONMENT=development
 
 ---
 
-## 6. Menjalankan Hermes
+## 6. Menjalankan Archon
 
 ### Cara Paling Mudah (disarankan untuk awam)
 
@@ -141,7 +141,7 @@ Untuk mematikan semua: **klik 2x `stop.bat`**
 
 ```bash
 cd C:\Users\PC05\Documents\M.SyauqiAzka\proyek_besar
-backend\hermes-backend.exe
+backend\archon-backend.exe
 ```
 
 **Terminal 2 — Dashboard:**
@@ -178,7 +178,7 @@ Saat dashboard terbuka, ini yang kamu lihat:
 | Last Seen | Terakhir kali server lapor |
 
 ### Tabel Kandidat Cleanup
-Daftar file sampah yang ditemukan (log lama, file sementara, dsb.) — beserta ukuran dan kategori. Ini **hanya rekomendasi** — Hermes TIDAK menghapus apa pun tanpa persetujuan kamu.
+Daftar file sampah yang ditemukan (log lama, file sementara, dsb.) — beserta ukuran dan kategori. Ini **hanya rekomendasi** — Archon TIDAK menghapus apa pun tanpa persetujuan kamu.
 
 ---
 
@@ -201,7 +201,7 @@ IP backend (Enter untuk localhost:3001): [Enter]
 ```
 
 Folder `deploy\production-db\` berisi:
-- `hermes-agent` (binary Linux)
+- `archon-agent` (binary Linux)
 - `.env` (konfigurasi dengan server_id + api_key otomatis)
 
 Tinggal kirim ke server tujuan.
@@ -226,7 +226,7 @@ Response berisi 2 kunci penting: **`server_id`** dan **`api_key`**. Simpan kedua
 
 **Langkah 2 — Salin agent ke server**
 
-Copy file `hermes-agent` (dari folder `agent/`) ke server Linux tujuan.
+Copy file `archon-agent` (dari folder `agent/`) ke server Linux tujuan.
 
 **Langkah 3 — Buat file konfigurasi agent di server tujuan**
 
@@ -234,29 +234,29 @@ Buat file `.env` di sebelah binary agent, isinya:
 
 ```env
 # ID server & kunci dari Langkah 1
-HERMES_SERVER_ID=<server_id>
-HERMES_API_KEY=<api_key>
+ARCHON_SERVER_ID=<server_id>
+ARCHON_API_KEY=<api_key>
 
 # Alamat backend — ganti dengan IP/server tempat backend berjalan
-HERMES_BACKEND_URL=http://<IP-SERVER-BACKEND>:3001/api/v1
+ARCHON_BACKEND_URL=http://<IP-SERVER-BACKEND>:3001/api/v1
 
 # Berapa sering scan (format cron): "0 * * * *" = setiap jam
-HERMES_SCAN_INTERVAL=0 * * * *
+ARCHON_SCAN_INTERVAL=0 * * * *
 
 # Folder yang dipantau (pisahkan dengan koma)
-HERMES_MOUNT_PATHS=/,/var,/home
+ARCHON_MOUNT_PATHS=/,/var,/home
 ```
 
 **Langkah 4 — Jalankan agent**
 
 ```bash
-chmod +x hermes-agent
-./hermes-agent
+chmod +x archon-agent
+./archon-agent
 ```
 
 > ⚠️ **Kalau muncul `Permission denied`** padahal sudah `chmod +x` (biasanya di VM/pod milik penyedia hosting):
 > ```bash
-> bash ~/hermes-agent
+> bash ~/archon-agent
 > ```
 > Itu trik untuk filesystem yang melarang eksekusi langsung (`noexec`). Agent tetap jalan normal lewat bash.
 
@@ -271,9 +271,9 @@ Refresh http://localhost:3000 — server baru muncul di tabel.
 ### Menjalankan agent di background (tetap jalan walau terminal ditutup)
 
 ```bash
-cd ~ && nohup ./hermes-agent > agent.log 2>&1 &
+cd ~ && nohup ./archon-agent > agent.log 2>&1 &
 tail -f ~/agent.log    # lihat log
-pkill hermes-agent     # berhenti
+pkill archon-agent     # berhenti
 ```
 
 ### Verifikasi data masuk
@@ -287,7 +287,7 @@ Server baru muncul dengan `used_percent` (persen pemakaian disk asli).
 
 ## 9. Menghubungkan Notifikasi WhatsApp (Opsional)
 
-Hermes bisa kirim notifikasi ke WhatsApp kamu kalau ada yang bermasalah (misal storage hampir penuh).
+Archon bisa kirim notifikasi ke WhatsApp kamu kalau ada yang bermasalah (misal storage hampir penuh).
 
 1. Daftar di https://wablas.com/ (atau provider lain seperti Fonnte)
 2. Setelah dapat API token, isi di file `.env`:
@@ -309,10 +309,10 @@ Command WhatsApp yang bisa dipakai (kirim ke nomor bot):
 ```
 proyek_besar/
 ├── agent/                  # Program Agent (dipasang di server yang dipantau)
-│   ├── hermes-agent        # Binary agent untuk Linux
+│   ├── archon-agent        # Binary agent untuk Linux
 │   └── cmd/agent/main.go   # Kode sumber agent
 ├── backend/                # Program Backend (pusat data)
-│   ├── hermes-backend.exe  # Binary backend untuk Windows
+│   ├── archon-backend.exe  # Binary backend untuk Windows
 │   └── internal/           # Kode sumber backend (handler, db, dsb)
 ├── dashboard/              # Website Dashboard
 │   └── app/page.tsx        # Halaman utama dashboard
@@ -328,7 +328,7 @@ proyek_besar/
 ## 11. Troubleshooting (Masalah Umum & Solusinya)
 
 ### "Gagal terhubung ke backend" di dashboard
-- Pastikan `hermes-backend.exe` jalan. Cek dengan klik 2x `start.bat`
+- Pastikan `archon-backend.exe` jalan. Cek dengan klik 2x `start.bat`
 - Cek di browser: buka http://localhost:3001/health — harus muncul `{"status":"ok"}`
 - Kalau tidak, tekan **Ctrl+F5** di dashboard (refresh paksa)
 
@@ -365,8 +365,8 @@ proyek_besar/
 
 ## 12. Pertanyaan Umum (FAQ)
 
-**Q: Apakah Hermes bisa menghapus file sendiri?**
-A: Tidak. Hermes hanya memberikan rekomendasi file mana yang aman dibersihkan. Penghapusan selalu butuh persetujuan kamu, dan file masuk ke tempat sampah (snapshot) dulu — masih bisa dipulihkan dalam 48 jam.
+**Q: Apakah Archon bisa menghapus file sendiri?**
+A: Tidak. Archon hanya memberikan rekomendasi file mana yang aman dibersihkan. Penghapusan selalu butuh persetujuan kamu, dan file masuk ke tempat sampah (snapshot) dulu — masih bisa dipulihkan dalam 48 jam.
 
 **Q: Berapa biaya untuk pakai ini?**
 A: Biaya utama adalah Supabase (gratis untuk pemakaian kecil) dan server tempat backend berjalan. Satu akun Supabase gratis sudah cukup untuk project ini.

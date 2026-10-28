@@ -8,9 +8,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/hermes/backend/internal/db"
-	"github.com/hermes/backend/internal/handlers"
 	"github.com/joho/godotenv"
+
+	"github.com/archon/backend/internal/db"
+	"github.com/archon/backend/internal/handlers"
+	"github.com/archon/backend/internal/prediction"
 )
 
 func main() {
@@ -18,7 +20,7 @@ func main() {
 	_ = godotenv.Load()
 
 	app := fiber.New(fiber.Config{
-		AppName: "Hermes Backend API v1.0",
+		AppName: "Archon Backend API v1.0",
 	})
 
 	// Middleware
@@ -33,7 +35,7 @@ func main() {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status":  "ok",
-			"service": "hermes-backend",
+			"service": "archon-backend",
 		})
 	})
 
@@ -48,6 +50,13 @@ func main() {
 	}
 	defer dbService.Close()
 	log.Println("Connected to database (Supabase)")
+
+	// Start prediction scheduler (background cron)
+	predictionScheduler := prediction.NewScheduler(dbService.DB)
+	if err := predictionScheduler.Start(); err != nil {
+		log.Printf("Warning: failed to start prediction scheduler: %v", err)
+	}
+	defer predictionScheduler.Stop()
 
 	// API v1 routes
 	api := app.Group("/api/v1")
@@ -66,9 +75,32 @@ func main() {
 	api.Get("/servers/:id/cleanup-candidates", serverHandler.GetCleanupCandidates)
 	api.Post("/servers/:id/cleanup", serverHandler.TriggerCleanup)
 
+	// Onboarding & connection endpoints
+	onboardingHandler := handlers.NewOnboardingHandler(dbService)
+	api.Post("/servers", onboardingHandler.CreateServer)
+	api.Post("/servers/:id/connection-test", onboardingHandler.TestConnection)
+	api.Patch("/servers/:id/settings", onboardingHandler.UpdateServerSettings)
+	api.Get("/servers/:id/command-logs", onboardingHandler.GetCommandLogs)
+
+	// SSH command execution endpoints
+	sshHandler := handlers.NewSSHHandler(dbService)
+	api.Post("/servers/:id/ssh/execute", sshHandler.ExecuteCommand)
+	api.Post("/servers/:id/scan", sshHandler.ScanDiskUsage)
+
+	// SSH access helper (local terminal shortcuts)
+	sshAccessHandler := handlers.NewSSHAccessHandler(dbService)
+	api.Get("/servers/:id/ssh-command", sshAccessHandler.GetSSHCommand)
+	api.Get("/servers/:id/ssh-test", sshAccessHandler.QuickTestConnection)
+
 	// Cleanup management
 	cleanupHandler := handlers.NewCleanupHandler(dbService)
 	api.Post("/cleanup-actions/:id/restore", cleanupHandler.RestoreFiles)
+
+	// Cleanup recipes (kategori B)
+	recipeHandler := handlers.NewRecipeHandler(dbService)
+	api.Get("/servers/:id/cleanup-recipes", recipeHandler.ListRecipes)
+	api.Get("/servers/:id/cleanup-recipes/:recipe_id/estimate", recipeHandler.EstimateRecipe)
+	api.Post("/servers/:id/cleanup-recipes/:recipe_id/execute", recipeHandler.ExecuteRecipe)
 
 	// API Keys endpoints
 	apiKeyHandler := handlers.NewApiKeyHandler(dbService)

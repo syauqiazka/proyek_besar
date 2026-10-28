@@ -1,4 +1,4 @@
-# Register Server Baru — Hermes
+# Register Server Baru — Archon
 
 ## Cara Pakai
 
@@ -16,16 +16,16 @@ register-server.bat
   │   └── Backend generate server_id + api_key (random 128 char hex)
   │
   ├── Generate .env → deploy/<nama-server>/.env
-  │   └── Berisi: HERMES_SERVER_ID, HERMES_API_KEY, HERMES_BACKEND_URL, dll
+  │   └── Berisi: ARCHON_SERVER_ID, ARCHON_API_KEY, ARCHON_BACKEND_URL, dll
   │
-  └── Copy binary → deploy/<nama-server>/hermes-agent
+  └── Copy binary → deploy/<nama-server>/archon-agent
       └── Binary Linux 10MB siap deploy
 ```
 
 ## Setelah Register
 
 Folder `deploy/<nama-server>/` berisi 2 file:
-- `hermes-agent` — binary untuk Linux
+- `archon-agent` — binary untuk Linux
 - `.env` — konfigurasi dengan kunci unik server ini
 
 ### Kirim ke server tujuan:
@@ -35,13 +35,13 @@ scp deploy/<nama-server>/* user@192.168.x.x:~/~
 
 ### Di server Linux:
 ```bash
-chmod +x ~/hermes-agent
-cd ~ && ./hermes-agent
+chmod +x ~/archon-agent
+cd ~ && ./archon-agent
 ```
 
 ### Kalau Permission denied (di VM/pod):
 ```bash
-cd ~ && bash ~/hermes-agent
+cd ~ && bash ~/archon-agent
 ```
 
 ## Server Mana Saja yang Sudah Terdaftar
@@ -56,18 +56,18 @@ Atau buka dashboard: http://localhost:3000
 ## Berhentikan Agent di Server
 
 ```bash
-pkill hermes-agent
+pkill archon-agent
 ```
 
 ## Mulai Ulang Agent
 
 ```bash
-cd ~ && ./hermes-agent
+cd ~ && ./archon-agent
 ```
 
 ## Background (tetap jalan walau terminal ditutup)
 
 ```bash
-cd ~ && nohup ./hermes-agent > agent.log 2>&1 &
+cd ~ && nohup ./archon-agent > agent.log 2>&1 &
 tail -f ~/agent.log
 ```

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hermes/backend/internal/db"
+	"github.com/archon/backend/internal/db"
 )
 
 type ServerHandler struct {
@@ -47,23 +47,23 @@ type CleanupRequest struct {
 // GetServers — daftar semua server + snapshot terakhir (untuk dashboard)
 func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 	rows, err := h.db.DB.Query(`
-		SELECT s.id, s.hostname,
+		SELECT s.id, s.name, s.hostname,
 		       CASE
-		           WHEN s.last_seen_at IS NULL THEN 'unknown'
-		           WHEN s.last_seen_at < NOW() - INTERVAL '5 minutes' THEN 'offline'
+		           WHEN s.last_seen_at IS NULL THEN 'pending'
+		           WHEN s.last_seen_at < NOW() - INTERVAL '5 minutes' THEN 'error'
 		           ELSE s.status
 		       END AS status,
 		       s.last_seen_at,
-		       COALESCE(ss.used_percent, 0) AS used_percent,
+		       COALESCE(ss.usage_percent, 0) AS used_percent,
 		       COALESCE(ss.total_bytes, 0) AS total_bytes,
 		       COALESCE(ss.used_bytes, 0) AS used_bytes,
 		       COALESCE(ss.available_bytes, 0) AS available_bytes
 		FROM servers s
 		LEFT JOIN LATERAL (
-			SELECT used_percent, total_bytes, used_bytes, available_bytes
+			SELECT usage_percent, total_bytes, used_bytes, available_bytes
 			FROM storage_snapshots
 			WHERE server_id = s.id
-			ORDER BY timestamp DESC LIMIT 1
+			ORDER BY captured_at DESC LIMIT 1
 		) ss ON TRUE
 		ORDER BY s.created_at DESC`)
 	if err != nil {
@@ -73,6 +73,7 @@ func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 
 	type serverRow struct {
 		ID             string     `json:"id"`
+		Name           string     `json:"name"`
 		Hostname       string     `json:"hostname"`
 		Status         string     `json:"status"`
 		LastSeenAt     *time.Time `json:"last_seen_at"`
@@ -86,7 +87,7 @@ func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 	for rows.Next() {
 		var s serverRow
 		var lastSeen sql.NullTime
-		if err := rows.Scan(&s.ID, &s.Hostname, &s.Status, &lastSeen,
+		if err := rows.Scan(&s.ID, &s.Name, &s.Hostname, &s.Status, &lastSeen,
 			&s.UsedPercent, &s.TotalBytes, &s.UsedBytes, &s.AvailableBytes); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Scan error"})
 		}
@@ -105,8 +106,8 @@ func (h *ServerHandler) GetPrediction(c *fiber.Ctx) error {
 
 	// Ambil 2 snapshot terakhir untuk hitung growth rate
 	rows, err := h.db.DB.Query(`
-		SELECT total_bytes, used_bytes, timestamp FROM storage_snapshots
-		WHERE server_id = $1 ORDER BY timestamp DESC LIMIT 2`, serverID)
+		SELECT total_bytes, used_bytes, captured_at FROM storage_snapshots
+		WHERE server_id = $1 ORDER BY captured_at DESC LIMIT 2`, serverID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 	}
@@ -181,7 +182,7 @@ func (h *ServerHandler) GetCleanupCandidates(c *fiber.Ctx) error {
 	serverID := c.Params("id")
 
 	rows, err := h.db.DB.Query(`
-		SELECT id, path, size_bytes, last_access, category, confidence
+		SELECT id, file_path, size_bytes, category, confidence, detected_at
 		FROM file_candidates
 		WHERE server_id = $1 AND status = 'pending'
 		ORDER BY size_bytes DESC LIMIT 50`, serverID)
@@ -193,13 +194,11 @@ func (h *ServerHandler) GetCleanupCandidates(c *fiber.Ctx) error {
 	var candidates []CleanupCandidate
 	for rows.Next() {
 		var f CleanupCandidate
-		var lastAccess sql.NullTime
-		if err := rows.Scan(&f.FileID, &f.Path, &f.SizeBytes, &lastAccess, &f.Category, &f.Confidence); err != nil {
+		var detectedAt time.Time
+		if err := rows.Scan(&f.FileID, &f.Path, &f.SizeBytes, &f.Category, &f.Confidence, &detectedAt); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Scan error"})
 		}
-		if lastAccess.Valid {
-			f.LastAccess = lastAccess.Time
-		}
+		f.LastAccess = detectedAt // use detected_at as placeholder
 		f.SizeMB = float64(f.SizeBytes) / (1024 * 1024)
 		candidates = append(candidates, f)
 	}
@@ -211,7 +210,7 @@ func (h *ServerHandler) GetCleanupCandidates(c *fiber.Ctx) error {
 	})
 }
 
-// TriggerCleanup — wajib confirmed:true; simpan cleanup_action (audit trail) tanpa hapus file (agent yang eksekusi)
+// TriggerCleanup — wajib confirmed:true; simpan cleanup_action (audit trail)
 func (h *ServerHandler) TriggerCleanup(c *fiber.Ctx) error {
 	serverID := c.Params("id")
 
@@ -230,50 +229,67 @@ func (h *ServerHandler) TriggerCleanup(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "No files specified for cleanup"})
 	}
 
+	// Check if cleanup enabled for this server (prinsip desain #9)
+	var cleanupEnabled bool
+	err := h.db.DB.QueryRow(`SELECT cleanup_enabled FROM servers WHERE id = $1`, serverID).Scan(&cleanupEnabled)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Server not found"})
+	}
+	if !cleanupEnabled {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "Cleanup not enabled for this server. Enable it in server settings first.",
+		})
+	}
+
 	// Pastikan setiap file milik server ini
-	var validCount int
+	var totalBytes int64
+	validFiles := []string{}
 	for _, fid := range req.FileIDs {
-		var cnt int
+		var path string
+		var size int64
 		err := h.db.DB.QueryRow(`
-			SELECT COUNT(*) FROM file_candidates WHERE id = $1 AND server_id = $2`,
-			fid, serverID).Scan(&cnt)
-		if err == nil && cnt == 1 {
-			validCount++
+			SELECT file_path, size_bytes FROM file_candidates 
+			WHERE id = $1 AND server_id = $2 AND status = 'pending'`,
+			fid, serverID).Scan(&path, &size)
+		if err == nil {
+			validFiles = append(validFiles, fid)
+			totalBytes += size
 		}
 	}
-	if validCount == 0 {
+	if len(validFiles) == 0 {
 		return c.Status(400).JSON(fiber.Map{"error": "No valid file candidates for this server"})
 	}
 
-	// Buat cleanup_action status=pending — agent akan eksekusi & pindahkan file ke snapshot
+	// Buat cleanup_action (kategori A: file_candidate)
 	var actionID string
-	err := h.db.DB.QueryRow(`
-		INSERT INTO cleanup_actions (server_id, reason, file_count, status, confirmed, started_at, restore_window_until)
-		VALUES ($1, $2, $3, 'pending', TRUE, NOW(), NOW() + INTERVAL '48 hours')
-		RETURNING id`, serverID, req.Reason, validCount).Scan(&actionID)
+	err = h.db.DB.QueryRow(`
+		INSERT INTO cleanup_actions 
+			(server_id, category, files_deleted, bytes_freed, confirmed, dry_run, details)
+		VALUES ($1, 'file_candidate', $2, $3, TRUE, FALSE, $4)
+		RETURNING id`, 
+		serverID, len(validFiles), totalBytes, 
+		map[string]interface{}{"file_ids": validFiles, "reason": req.Reason}).Scan(&actionID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create cleanup action", "detail": err.Error()})
 	}
 
-	// Masukkan ke cleanup_files
-	for _, fid := range req.FileIDs {
-		var path string
-		var size int64
-		err := h.db.DB.QueryRow(`SELECT path, size_bytes FROM file_candidates WHERE id = $1 AND server_id = $2`,
-			fid, serverID).Scan(&path, &size)
-		if err == nil {
-			_, _ = h.db.DB.Exec(`
-				INSERT INTO cleanup_files (cleanup_action_id, file_candidate_id, original_path, size_bytes)
-				VALUES ($1, $2, $3, $4)`, actionID, fid, path, size)
-		}
+	// Update file_candidates status to approved
+	_, err = h.db.DB.Exec(`
+		UPDATE file_candidates 
+		SET status = 'approved' 
+		WHERE id = ANY($1) AND server_id = $2`, 
+		validFiles, serverID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update candidates"})
 	}
 
 	return c.Status(202).JSON(fiber.Map{
-		"message":          "Cleanup request accepted",
-		"server_id":        serverID,
+		"message":           "Cleanup request accepted",
+		"server_id":         serverID,
 		"cleanup_action_id": actionID,
-		"file_count":       validCount,
-		"status":           "pending",
-		"note":             "Files will be moved to snapshot, not permanently deleted",
+		"file_count":        len(validFiles),
+		"bytes_to_free":     totalBytes,
+		"status":            "pending",
+		"note":              "Files will be moved to snapshot, not permanently deleted (48h restore window)",
 	})
 }

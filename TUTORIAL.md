@@ -1,4 +1,4 @@
-# Hermes — Tutorial Lengkap untuk Pemula
+# Archon — Tutorial Lengkap untuk Pemula
 
 Dari nol sampai bisa monitoring server sendiri.
 
@@ -6,13 +6,13 @@ Dari nol sampai bisa monitoring server sendiri.
 
 ## DAFTAR ISI
 
-1. [Apa itu Hermes?](#1-apa-itu-hermes)
-2. [Cara Kerja Hermes](#2-cara-kerja-hermes)
+1. [Apa itu Archon?](#1-apa-itu-archon)
+2. [Cara Kerja Archon](#2-cara-kerja-archon)
 3. [Yang Dibutuhkan](#3-yang-dibutuhkan)
 4. [Persiapan Database (Supabase)](#4-persiapan-database-supabase)
 5. [Install di Windows (Backend + Dashboard)](#5-install-di-windows-backend--dashboard)
 6. [Isi File Konfigurasi (.env)](#6-isi-file-konfigurasi-env)
-7. [Menjalankan Hermes](#7-menjalankan-hermes)
+7. [Menjalankan Archon](#7-menjalankan-archon)
 8. [Memahami Dashboard](#8-memahami-dashboard)
 9. [Menambah Server Baru (Step-by-Step)](#9-menambah-server-baru-step-by-step)
 10. [Menjalankan Agent di Background](#10-menjalankan-agent-di-background)
@@ -22,9 +22,9 @@ Dari nol sampai bisa monitoring server sendiri.
 
 ---
 
-## 1. Apa itu Hermes?
+## 1. Apa itu Archon?
 
-Hermes adalah **program yang mengawasi penyimpanan (storage) server** secara otomatis.
+Archon adalah **program yang mengawasi penyimpanan (storage) server** secara otomatis.
 
 **Masalah yang dipecahkan:**
 - Server tiba-tiba penuh → website down → bisnis rugi
@@ -32,7 +32,7 @@ Hermes adalah **program yang mengawasi penyimpanan (storage) server** secara oto
 - File sampah menumpuk tapi tidak tahu mana yang aman dihapus
 - Backup tidak dicek → data hilang tapi baru sadar terlambat
 
-**Solusi Hermes:**
+**Solusi Archon:**
 - Pantau pemakaian storage real-time
 - Prediksi kapan server akan penuh (dengan range min/max)
 - Rekomendasi file sampah yang aman dibersihkan
@@ -41,7 +41,7 @@ Hermes adalah **program yang mengawasi penyimpanan (storage) server** secara oto
 
 ---
 
-## 2. Cara Kerja Hermes
+## 2. Cara Kerja Archon
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -53,9 +53,9 @@ Hermes adalah **program yang mengawasi penyimpanan (storage) server** secara oto
                          │ baca data
                          ▼
 ┌──────────────────────────────────────────────────────┐
-│               HERMES BACKEND (PC kamu)                │
+│               ARCHON BACKEND (PC kamu)                │
 │                                                      │
-│   hermes-backend.exe → port 3001                     │
+│   archon-backend.exe → port 3001                     │
 │   Terima data dari semua agent                        │
 │   Simpan ke database, hitung prediksi                 │
 └────────────────────────┬─────────────────────────────┘
@@ -75,14 +75,14 @@ Hermes adalah **program yang mengawasi penyimpanan (storage) server** secara oto
 └───────┬────────┘  └───────┬────────┘  └───────┬────────┘
         └───────────────────┼───────────────────┘
                             ▼ kirim data ke backend
-                     hermes-backend:3001
+                     archon-backend:3001
 ```
 
 **3 komponen utama:**
 | Komponen | Tempat Jalan | Tugas |
 |---|---|---|
-| `hermes-agent` | Server Linux yang dipantau | Scan disk, kirim data ke backend |
-| `hermes-backend.exe` | PC/Windows kamu | Terima data, hitung prediksi, layani dashboard |
+| `archon-agent` | Server Linux yang dipantau | Scan disk, kirim data ke backend |
+| `archon-backend.exe` | PC/Windows kamu | Terima data, hitung prediksi, layani dashboard |
 | Dashboard (Next.js) | Browser kamu | Tampilan visual untuk monitor semua server |
 
 ---
@@ -109,7 +109,7 @@ Hermes adalah **program yang mengawasi penyimpanan (storage) server** secara oto
 
 ## 4. Persiapan Database (Supabase)
 
-Supabase adalah database cloud gratis. Hermes menyimpan semua data di sini.
+Supabase adalah database cloud gratis. Archon menyimpan semua data di sini.
 
 ### Langkah 1: Buat Akun Supabase
 
@@ -119,7 +119,7 @@ Supabase adalah database cloud gratis. Hermes menyimpan semua data di sini.
 4. Setelah masuk, klik **"New Project"**
 5. Isi:
    - **Organization**: pilih atau buat baru
-   - **Project name**: `hermes`
+   - **Project name**: `archon`
    - **Database Password**: buat password yang kuat (**CATAT! ini tidak bisa dilihat lagi**)
    - **Region**: pilih yang terdekat (misal Singapore / Asia East)
 6. Klik **"Create new project"** → tunggu ~2 menit
@@ -159,11 +159,11 @@ cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar
 ```bash
 cd backend
 go mod tidy
-go build -o hermes-backend.exe cmd/api/main.go
+go build -o archon-backend.exe cmd/api/main.go
 cd ..
 ```
 
-Kalau berhasil, akan muncul file `hermes-backend.exe` di folder `backend/`.
+Kalau berhasil, akan muncul file `archon-backend.exe` di folder `backend/`.
 
 ### 5c. Install Dashboard (Node.js)
 
@@ -212,7 +212,7 @@ ENVIRONMENT=development
 
 ---
 
-## 7. Menjalankan Hermes
+## 7. Menjalankan Archon
 
 ### Cara Paling Mudah (2 klik)
 
@@ -234,7 +234,7 @@ Ada file bantuan di root project:
 **Terminal 1 — Backend:**
 ```bash
 cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar
-backend\hermes-backend.exe
+backend\archon-backend.exe
 ```
 
 **Terminal 2 — Dashboard:**
@@ -276,13 +276,13 @@ Saat pertama kali dibuka, dashboard akan menampilkan data. Berikut panduan memba
 
 ### Tabel Kandidat Cleanup
 
-Daftar file sampah yang ditemukan. **Hermes TIDAK menghapus apa pun** — hanya rekomendasi.
+Daftar file sampah yang ditemukan. **Archon TIDAK menghapus apa pun** — hanya rekomendasi.
 
 ---
 
 ## 9. Menambah Server Baru (Step-by-Step)
 
-Ini bagian paling penting — cara pasang Hermes di server baru.
+Ini bagian paling penting — cara pasang Archon di server baru.
 
 ### Langkah 1: Register Server di Backend
 
@@ -300,7 +300,7 @@ curl -X POST http://localhost:3001/api/v1/agent/register ^
 ```json
 {
     "server_id": "7e1ba593-8f64-4bdd-9242-d245e41e9b8e",
-    "api_key": "hermes_ac7008d1554f98958c84835d93bdb9b4...",
+    "api_key": "archon_ac7008d1554f98958c84835d93bdb9b4...",
     "message": "Agent registered successfully"
 }
 ```
@@ -312,29 +312,29 @@ curl -X POST http://localhost:3001/api/v1/agent/register ^
 ```bash
 cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar\agent
 go mod tidy
-GOOS=linux GOARCH=amd64 go build -o hermes-agent cmd/agent/main.go
+GOOS=linux GOARCH=amd64 go build -o archon-agent cmd/agent/main.go
 ```
 
-File `hermes-agent` (sekitar 10MB) akan terbuat — ini binary untuk Linux.
+File `archon-agent` (sekitar 10MB) akan terbuat — ini binary untuk Linux.
 
 ### Langkah 3: Kirim ke Server Tujuan
 
 ```bash
 # Kirim binary + file .env
-scp hermes-agent user@192.168.x.x:~/
+scp archon-agent user@192.168.x.x:~/
 ```
 
 ### Langkah 4: Buat File .env di Server Tujuan
 
-Di server Linux, buat file `.env` di folder yang sama dengan `hermes-agent`:
+Di server Linux, buat file `.env` di folder yang sama dengan `archon-agent`:
 
 ```bash
 cat > ~/.env << 'EOF'
-HERMES_SERVER_ID=<server_id dari Langkah 1>
-HERMES_API_KEY=<api_key dari Langkah 1>
-HERMES_BACKEND_URL=http://<IP-WINDOWS-KAMU>:3001/api/v1
-HERMES_SCAN_INTERVAL=*/5 * * * *
-HERMES_MOUNT_PATHS=/,/home
+ARCHON_SERVER_ID=<server_id dari Langkah 1>
+ARCHON_API_KEY=<api_key dari Langkah 1>
+ARCHON_BACKEND_URL=http://<IP-WINDOWS-KAMU>:3001/api/v1
+ARCHON_SCAN_INTERVAL=*/5 * * * *
+ARCHON_MOUNT_PATHS=/,/home
 EOF
 ```
 
@@ -347,13 +347,13 @@ EOF
 
 ```bash
 cd ~
-chmod +x hermes-agent
-./hermes-agent
+chmod +x archon-agent
+./archon-agent
 ```
 
 **Kalau muncul `Permission denied`:**
 ```bash
-bash ~/hermes-agent
+bash ~/archon-agent
 ```
 (Ini terjadi di VM/pod yang filesystem-nya `noexec` — tidak bisa eksekusi langsung, tapi `bash` bisa membaca dan menjalankan binary)
 
@@ -368,7 +368,7 @@ bash ~/hermes-agent
 
 3. **Di server** (Linux): agent menampilkan:
    ```
-   Hermes Agent starting...
+   Archon Agent starting...
    Running initial scan...
    Storage metrics sent successfully
    Agent running with scan interval: */5 * * * *
@@ -384,25 +384,25 @@ Agar agent tetap jalan walau terminal ditutup:
 
 ```bash
 # Jalankan di background
-cd ~ && nohup ./hermes-agent > agent.log 2>&1 &
+cd ~ && nohup ./archon-agent > agent.log 2>&1 &
 
 # Lihat log
 tail -f ~/agent.log
 
 # Berhentikan agent
-pkill hermes-agent
+pkill archon-agent
 ```
 
 Kalau di pod/VM dengan `noexec`:
 ```bash
-cd ~ && nohup bash hermes-agent > agent.log 2>&1 &
+cd ~ && nohup bash archon-agent > agent.log 2>&1 &
 ```
 
 ---
 
 ## 11. Notifikasi WhatsApp (Opsional)
 
-Hermes bisa kirim peringatan ke WhatsApp kalau storage hampir penuh.
+Archon bisa kirim peringatan ke WhatsApp kalau storage hampir penuh.
 
 ### Langkah 1: Daftar Wablas
 
@@ -443,7 +443,7 @@ Kirim pesan ke nomor bot WhatsApp:
 |---|---|
 | `DATABASE_URL environment variable is required` | Backend dijalankan dari folder yang salah. Jalankan dari ROOT folder (`proyek_besar`), bukan dari `backend/` |
 | `password authentication failed` | Password database di `.env` salah. Buka Supabase → Settings → Database → ganti password |
-| `Only one usage of each socket address` | Port sudah dipakai. Matikan dulu: `taskkill /F /IM hermes-backend.exe` |
+| `Only one usage of each socket address` | Port sudah dipakai. Matikan dulu: `taskkill /F /IM archon-backend.exe` |
 | Backend jalan tapi dashboard tidak bisa akses | Cek firewall Windows, pastikan port 3001 terbuka |
 
 ### Dashboard
@@ -458,10 +458,10 @@ Kirim pesan ke nomor bot WhatsApp:
 
 | Masalah | Solusi |
 |---|---|
-| `Permission denied` | Jalankan pakai `bash ~/hermes-agent` (untuk filesystem noexec) |
-| `HERMES_SERVER_ID environment variable is required` | File `.env` tidak ada atau di folder berbeda. Pastikan `.env` sejajar dengan binary |
+| `Permission denied` | Jalankan pakai `bash ~/archon-agent` (untuk filesystem noexec) |
+| `ARCHON_SERVER_ID environment variable is required` | File `.env` tidak ada atau di folder berbeda. Pastikan `.env` sejajar dengan binary |
 | Agent jalan tapi data tidak muncul di dashboard | Cek `curl http://<IP-BACKEND>:3001/health` dari server agent — harus `{"status":"ok"}` |
-| Data tidak update | Tunggu sesuai `HERMES_SCAN_INTERVAL` (default tiap 5 menit) |
+| Data tidak update | Tunggu sesuai `ARCHON_SCAN_INTERVAL` (default tiap 5 menit) |
 | Status server `offline` di dashboard | Agent berhenti atau koneksi terputus. Jalankan ulang agent |
 
 ### Database
@@ -476,14 +476,14 @@ Kirim pesan ke nomor bot WhatsApp:
 
 ## 13. FAQ
 
-**Q: Berapa biaya pakai Hermes?**
+**Q: Berapa biaya pakai Archon?**
 A: Gratis. Backend jalan di PC kamu, database pakai Supabase free tier (500MB), agent cuma 10MB binary.
 
 **Q: Berapa banyak server yang bisa dipantau?**
 A: Tidak ada batas. Satu backend bisa terima data dari puluhan server sekaligus.
 
-**Q: Apakah Hermes bisa hapus file sendiri?**
-A: Tidak. Hermes hanya memberi rekomendasi. Penghapusan butuh persetujuan kamu. File juga masuk "tempat sampah" dulu — masih bisa dipulihkan dalam 48 jam.
+**Q: Apakah Archon bisa hapus file sendiri?**
+A: Tidak. Archon hanya memberi rekomendasi. Penghapusan butuh persetujuan kamu. File juga masuk "tempat sampah" dulu — masih bisa dipulihkan dalam 48 jam.
 
 **Q: Apakah aman?**
 A: Ya. Koneksi ke database pakai enkripsi (SSL). API key random 128 karakter hex, tidak bisa ditebak. File `.env` tidak di-commit ke Git.
@@ -498,7 +498,7 @@ A: Tidak. Data tersimpan di Supabase (cloud). Saat server hidup lagi, agent lang
 A: Buka Supabase Dashboard → Settings → Database → Reset Database Password → update di file `.env` → restart backend.
 
 **Q: Mau deploy ke production (24 jam online)?**
-A: Backend + dashboard pindah ke VPS (DigitalOcean, AWS, dll). Ganti `HERMES_BACKEND_URL` di semua agent ke IP VPS. Dashboard bisa di-host di Vercel gratis.
+A: Backend + dashboard pindah ke VPS (DigitalOcean, AWS, dll). Ganti `ARCHON_BACKEND_URL` di semua agent ke IP VPS. Dashboard bisa di-host di Vercel gratis.
 
 ---
 
@@ -507,10 +507,10 @@ A: Backend + dashboard pindah ke VPS (DigitalOcean, AWS, dll). Ganti `HERMES_BAC
 ```
 proyek_besar/
 ├── agent/                  # Program agent (dipasang di server Linux)
-│   ├── hermes-agent        # Binary Linux (build dengan GOOS=linux)
+│   ├── archon-agent        # Binary Linux (build dengan GOOS=linux)
 │   └── cmd/agent/main.go   # Kode sumber
 ├── backend/                # Program backend (jalan di Windows)
-│   ├── hermes-backend.exe  # Binary Windows
+│   ├── archon-backend.exe  # Binary Windows
 │   └── internal/           # Kode sumber (handlers, db, dsb)
 ├── dashboard/              # Website monitoring
 │   └── app/page.tsx        # Halaman utama
