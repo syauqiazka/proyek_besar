@@ -1,0 +1,21 @@
+[Unit]
+Description=Hermes Storage Monitor Agent
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/hermes
+ExecStart=/opt/hermes/hermes-agent
+Restart=always
+RestartSec=5
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+# Batas sumber daya (opsional untuk server produksi)
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

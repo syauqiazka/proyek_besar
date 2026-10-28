@@ -1,0 +1,527 @@
+# Hermes — Tutorial Lengkap untuk Pemula
+
+Dari nol sampai bisa monitoring server sendiri.
+
+---
+
+## DAFTAR ISI
+
+1. [Apa itu Hermes?](#1-apa-itu-hermes)
+2. [Cara Kerja Hermes](#2-cara-kerja-hermes)
+3. [Yang Dibutuhkan](#3-yang-dibutuhkan)
+4. [Persiapan Database (Supabase)](#4-persiapan-database-supabase)
+5. [Install di Windows (Backend + Dashboard)](#5-install-di-windows-backend--dashboard)
+6. [Isi File Konfigurasi (.env)](#6-isi-file-konfigurasi-env)
+7. [Menjalankan Hermes](#7-menjalankan-hermes)
+8. [Memahami Dashboard](#8-memahami-dashboard)
+9. [Menambah Server Baru (Step-by-Step)](#9-menambah-server-baru-step-by-step)
+10. [Menjalankan Agent di Background](#10-menjalankan-agent-di-background)
+11. [Notifikasi WhatsApp (Opsional)](#11-notifikasi-whatsapp-opsional)
+12. [Troubleshooting](#12-troubleshooting)
+13. [FAQ](#13-faq)
+
+---
+
+## 1. Apa itu Hermes?
+
+Hermes adalah **program yang mengawasi penyimpanan (storage) server** secara otomatis.
+
+**Masalah yang dipecahkan:**
+- Server tiba-tiba penuh → website down → bisnis rugi
+- Tidak tahu kapan server akan penuh
+- File sampah menumpuk tapi tidak tahu mana yang aman dihapus
+- Backup tidak dicek → data hilang tapi baru sadar terlambat
+
+**Solusi Hermes:**
+- Pantau pemakaian storage real-time
+- Prediksi kapan server akan penuh (dengan range min/max)
+- Rekomendasi file sampah yang aman dibersihkan
+- Cek status backup
+- Notifikasi via WhatsApp
+
+---
+
+## 2. Cara Kerja Hermes
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   KAMU (Admin)                        │
+│                                                      │
+│   Browser → http://localhost:3000 (Dashboard)         │
+│   Melihat semua server dalam 1 layar                  │
+└────────────────────────┬─────────────────────────────┘
+                         │ baca data
+                         ▼
+┌──────────────────────────────────────────────────────┐
+│               HERMES BACKEND (PC kamu)                │
+│                                                      │
+│   hermes-backend.exe → port 3001                     │
+│   Terima data dari semua agent                        │
+│   Simpan ke database, hitung prediksi                 │
+└────────────────────────┬─────────────────────────────┘
+                         │ simpan
+                         ▼
+┌──────────────────────────────────────────────────────┐
+│              DATABASE (Supabase - Cloud)               │
+│                                                      │
+│   PostgreSQL di internet → data aman, bisa diakses    │
+│   dari mana pun                                       │
+└──────────────────────────────────────────────────────┘
+
+┌────────────────┐  ┌────────────────┐  ┌────────────────┐
+│ Agent Server 1 │  │ Agent Server 2 │  │ Agent Server N │
+│ (Linux/VM)     │  │ (Linux/VM)     │  │ (Linux/VM)     │
+│ Scan disk lapor│  │ Scan disk lapor│  │ Scan disk lapor│
+└───────┬────────┘  └───────┬────────┘  └───────┬────────┘
+        └───────────────────┼───────────────────┘
+                            ▼ kirim data ke backend
+                     hermes-backend:3001
+```
+
+**3 komponen utama:**
+| Komponen | Tempat Jalan | Tugas |
+|---|---|---|
+| `hermes-agent` | Server Linux yang dipantau | Scan disk, kirim data ke backend |
+| `hermes-backend.exe` | PC/Windows kamu | Terima data, hitung prediksi, layani dashboard |
+| Dashboard (Next.js) | Browser kamu | Tampilan visual untuk monitor semua server |
+
+---
+
+## 3. Yang Dibutuhkan
+
+### Untuk Admin (kamu yang kelola):
+
+| Kebutuhan | Download / Daftar | Gratis? |
+|---|---|---|
+| Windows 10/11 | Sudah ada | ✅ |
+| Go 1.21+ | https://go.dev/dl/ | ✅ |
+| Node.js 18+ | https://nodejs.org/ | ✅ |
+| Akun Supabase | https://supabase.com/ | ✅ (untuk project kecil) |
+
+### Untuk Server yang Dipantau:
+
+| Kebutuhan | Keterangan |
+|---|---|
+| Linux (Ubuntu/Debian) | Server atau VM |
+| Akses internet ke backend | Bisa ping IP backend |
+
+---
+
+## 4. Persiapan Database (Supabase)
+
+Supabase adalah database cloud gratis. Hermes menyimpan semua data di sini.
+
+### Langkah 1: Buat Akun Supabase
+
+1. Buka **https://supabase.com/**
+2. Klik **"Start your project"** atau **"Sign Up"**
+3. Daftar pakai GitHub / Email
+4. Setelah masuk, klik **"New Project"**
+5. Isi:
+   - **Organization**: pilih atau buat baru
+   - **Project name**: `hermes`
+   - **Database Password**: buat password yang kuat (**CATAT! ini tidak bisa dilihat lagi**)
+   - **Region**: pilih yang terdekat (misal Singapore / Asia East)
+6. Klik **"Create new project"** → tunggu ~2 menit
+
+### Langkah 2: Ambil Connection String
+
+1. Di dashboard Supabase project, klik **Settings** (ikon ⚙️) di menu kiri → **Database**
+2. Cari bagian **Connection string**
+3. Pilih tab **URI**
+4. Pilih **Transaction pooler** di dropdown
+5. Salin connection string — bentuknya seperti ini:
+   ```
+   postgresql://postgres.xxxx:passwordxxxx@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+   ```
+6. **Simpan di tempat aman** — ini akan diisi ke file `.env`
+
+### Langkah 3: Ambil Publishable Key
+
+1. Masih di dashboard Supabase, klik **Settings** → **API**
+2. Cari **Project URL** → salin (bentuk: `https://xxxxx.supabase.co`)
+3. Cari **anon / publishable key** → salin (bentuk: `sb_publishable_xxxxx`)
+
+---
+
+## 5. Install di Windows (Backend + Dashboard)
+
+Buka **Command Prompt** atau **Git Bash**.
+
+### 5a. Clone / Buka Project
+
+```bash
+cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar
+```
+
+### 5b. Install Backend (Go)
+
+```bash
+cd backend
+go mod tidy
+go build -o hermes-backend.exe cmd/api/main.go
+cd ..
+```
+
+Kalau berhasil, akan muncul file `hermes-backend.exe` di folder `backend/`.
+
+### 5c. Install Dashboard (Node.js)
+
+```bash
+cd dashboard
+npm install
+cd ..
+```
+
+---
+
+## 6. Isi File Konfigurasi (.env)
+
+File `.env` ada di **root folder** project (`proyek_besar/.env`). Buat file baru jika belum ada:
+
+```bash
+cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar
+notepad .env
+```
+
+Isi dengan data milik kamu:
+
+```env
+# Port backend (jangan diubah kecuali port 3001 sudah terpakai)
+PORT=3001
+
+# DATABASE dari Supabase (tempel connection string dari Langkah 4.2)
+# Ganti <password> dengan password database yang kamu buat saat buat project
+DATABASE_URL=postgresql://postgres.xxxx:<password>@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+
+# URL + Key dari Supabase (tempel dari Langkah 4.3)
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxx
+
+# WhatsApp (isi jika mau pakai notifikasi WhatsApp, skip dulu jika tidak)
+WHATSAPP_API_URL=https://api.wablas.com/v125
+WHATSAPP_SECRET=token-kamu
+
+# Environment
+ENVIRONMENT=development
+```
+
+**PENTING:**
+- Simpan file, **jangan pernah bagikan `.env` ke orang lain** (berisi password)
+- `.env` sudah ada di `.gitignore` → tidak akan ter-commit ke GitHub
+
+---
+
+## 7. Menjalankan Hermes
+
+### Cara Paling Mudah (2 klik)
+
+Ada file bantuan di root project:
+
+| File | Fungsi |
+|---|---|
+| `start.bat` | Jalankan backend + dashboard sekaligus, buka browser otomatis |
+| `stop.bat` | Matikan semua |
+
+**Cara pakai:**
+1. Klik 2x `start.bat`
+2. Tunggu 10 detik
+3. Browser terbuka → http://localhost:3000
+4. Untuk matikan: klik 2x `stop.bat`
+
+### Cara Manual
+
+**Terminal 1 — Backend:**
+```bash
+cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar
+backend\hermes-backend.exe
+```
+
+**Terminal 2 — Dashboard:**
+```bash
+cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar\dashboard
+npm run dev
+```
+
+Buka browser: http://localhost:3000
+
+> ⚠️ **Backend HARUS dijalankan dari folder ROOT** (proyek_besar), bukan dari folder `backend/`. Kalau dari folder `backend/`, file `.env` tidak ditemukan → error `DATABASE_URL environment variable is required`.
+
+---
+
+## 8. Memahami Dashboard
+
+Saat pertama kali dibuka, dashboard akan menampilkan data. Berikut panduan membaca:
+
+### Kartu Statistik (atas)
+
+| Kartu | Arti |
+|---|---|
+| **Server Aktif** | Jumlah server yang sedang dipantau dan aktif |
+| **Total Terpakai** | Total penyimpanan yang terpakai dari semua server |
+| **Rata-rata Pemakaian** | Persentase pemakaian rata-rata semua server |
+| **Server Berisiko** | Server yang pemakaian ≥85% — kartu ini berubah **merah** |
+
+### Tabel Server
+
+| Kolom | Arti | Keterangan |
+|---|---|---|
+| **Server** | Nama server | Nama yang kamu daftarkan saat register |
+| **Status** | Kondisi server | 🟢 active = online, 🔴 offline = mati/lama tidak lapor |
+| **Pemakaian** | Persen terpakai + bar warna | 🟢 hijau = aman, 🟡 kuning = ≥75%, 🔴 merah = ≥90% |
+| **Terpakai** | Ukuran data terpakai | Contoh: 8.5 GB |
+| **Tersedia** | Sisa ruang kosong | Contoh: 11.5 GB |
+| **Prediksi Penuh** | Berapa hari lagi penuh | Best estimate + range min/max |
+| **Last Seen** | Terakhir kali server lapor | Kalau sudah >5 menit, status jadi `offline` |
+
+### Tabel Kandidat Cleanup
+
+Daftar file sampah yang ditemukan. **Hermes TIDAK menghapus apa pun** — hanya rekomendasi.
+
+---
+
+## 9. Menambah Server Baru (Step-by-Step)
+
+Ini bagian paling penting — cara pasang Hermes di server baru.
+
+### Langkah 1: Register Server di Backend
+
+Buka terminal di Windows, jalankan:
+
+```bash
+curl -X POST http://localhost:3001/api/v1/agent/register ^
+  -H "Content-Type: application/json" ^
+  -d "{\"hostname\":\"nama-server-kamu\",\"tenant_id\":\"b39f9091-eb31-4c18-b77c-d08ced5c8fb1\"}"
+```
+
+(Ganti `nama-server-kamu` dengan nama yang diinginkan, misal `web-01`, `db-01`, `vm-production`)
+
+**Response yang muncul:**
+```json
+{
+    "server_id": "7e1ba593-8f64-4bdd-9242-d245e41e9b8e",
+    "api_key": "hermes_ac7008d1554f98958c84835d93bdb9b4...",
+    "message": "Agent registered successfully"
+}
+```
+
+**CATAT kedua value ini** — `server_id` dan `api_key` akan diisi ke server tujuan.
+
+### Langkah 2: Build Agent untuk Linux
+
+```bash
+cd C:\Users\nama-kamu\Documents\M.SyauqiAzka\proyek_besar\agent
+go mod tidy
+GOOS=linux GOARCH=amd64 go build -o hermes-agent cmd/agent/main.go
+```
+
+File `hermes-agent` (sekitar 10MB) akan terbuat — ini binary untuk Linux.
+
+### Langkah 3: Kirim ke Server Tujuan
+
+```bash
+# Kirim binary + file .env
+scp hermes-agent user@192.168.x.x:~/
+```
+
+### Langkah 4: Buat File .env di Server Tujuan
+
+Di server Linux, buat file `.env` di folder yang sama dengan `hermes-agent`:
+
+```bash
+cat > ~/.env << 'EOF'
+HERMES_SERVER_ID=<server_id dari Langkah 1>
+HERMES_API_KEY=<api_key dari Langkah 1>
+HERMES_BACKEND_URL=http://<IP-WINDOWS-KAMU>:3001/api/v1
+HERMES_SCAN_INTERVAL=*/5 * * * *
+HERMES_MOUNT_PATHS=/,/home
+EOF
+```
+
+**Ganti nilai yang di dalam `<>`:**
+- `<server_id>` → dari response register
+- `<api_key>` → dari response register
+- `<IP-WINDOWS-KAMU>` → IP komputer Windows kamu (cari dengan `ipconfig`)
+
+### Langkah 5: Jalankan Agent
+
+```bash
+cd ~
+chmod +x hermes-agent
+./hermes-agent
+```
+
+**Kalau muncul `Permission denied`:**
+```bash
+bash ~/hermes-agent
+```
+(Ini terjadi di VM/pod yang filesystem-nya `noexec` — tidak bisa eksekusi langsung, tapi `bash` bisa membaca dan menjalankan binary)
+
+### Langkah 6: Verifikasi
+
+1. **Di dashboard** (Windows): refresh http://localhost:3000 → server baru muncul
+2. **Di terminal** (Windows):
+   ```bash
+   curl http://localhost:3001/api/v1/servers
+   ```
+   Server baru ada di list dengan data pemakaian disk **REAL**
+
+3. **Di server** (Linux): agent menampilkan:
+   ```
+   Hermes Agent starting...
+   Running initial scan...
+   Storage metrics sent successfully
+   Agent running with scan interval: */5 * * * *
+   ```
+
+**Selesai!** Server baru sudah terpantau.
+
+---
+
+## 10. Menjalankan Agent di Background
+
+Agar agent tetap jalan walau terminal ditutup:
+
+```bash
+# Jalankan di background
+cd ~ && nohup ./hermes-agent > agent.log 2>&1 &
+
+# Lihat log
+tail -f ~/agent.log
+
+# Berhentikan agent
+pkill hermes-agent
+```
+
+Kalau di pod/VM dengan `noexec`:
+```bash
+cd ~ && nohup bash hermes-agent > agent.log 2>&1 &
+```
+
+---
+
+## 11. Notifikasi WhatsApp (Opsional)
+
+Hermes bisa kirim peringatan ke WhatsApp kalau storage hampir penuh.
+
+### Langkah 1: Daftar Wablas
+
+1. Buka https://wablas.com/
+2. Daftar + verifikasi nomor WhatsApp
+3. Di dashboard Wablas, salin **API Token**
+
+### Langkah 2: Isi di .env (Windows)
+
+```env
+WHATSAPP_API_URL=https://api.wablas.com/v125
+WHATSAPP_SECRET=token-dari-wablas
+```
+
+### Langkah 3: Restart Backend
+
+```bash
+stop.bat
+start.bat
+```
+
+### Langkah 4: Pakai
+
+Kirim pesan ke nomor bot WhatsApp:
+| Command | Fungsi |
+|---|---|
+| `/cek-storage` | Status storage semua server |
+| `/cek-backup` | Status backup |
+| `/help` | Daftar semua command |
+
+---
+
+## 12. Troubleshooting
+
+### Backend
+
+| Masalah | Solusi |
+|---|---|
+| `DATABASE_URL environment variable is required` | Backend dijalankan dari folder yang salah. Jalankan dari ROOT folder (`proyek_besar`), bukan dari `backend/` |
+| `password authentication failed` | Password database di `.env` salah. Buka Supabase → Settings → Database → ganti password |
+| `Only one usage of each socket address` | Port sudah dipakai. Matikan dulu: `taskkill /F /IM hermes-backend.exe` |
+| Backend jalan tapi dashboard tidak bisa akses | Cek firewall Windows, pastikan port 3001 terbuka |
+
+### Dashboard
+
+| Masalah | Solusi |
+|---|---|
+| "Memuat data…" terus | Tekan **Ctrl+F5** (refresh paksa). Pastikan backend jalan |
+| `Gagal terhubung ke backend` | Backend tidak jalan atau port salah |
+| Tampilan aneh / hilang | Clear cache browser, atau buka tab incognito |
+
+### Agent
+
+| Masalah | Solusi |
+|---|---|
+| `Permission denied` | Jalankan pakai `bash ~/hermes-agent` (untuk filesystem noexec) |
+| `HERMES_SERVER_ID environment variable is required` | File `.env` tidak ada atau di folder berbeda. Pastikan `.env` sejajar dengan binary |
+| Agent jalan tapi data tidak muncul di dashboard | Cek `curl http://<IP-BACKEND>:3001/health` dari server agent — harus `{"status":"ok"}` |
+| Data tidak update | Tunggu sesuai `HERMES_SCAN_INTERVAL` (default tiap 5 menit) |
+| Status server `offline` di dashboard | Agent berhenti atau koneksi terputus. Jalankan ulang agent |
+
+### Database
+
+| Masalah | Solusi |
+|---|---|
+| Tabel tidak ada | Backend otomatis bikin tabel saat pertama kali jalan |
+| Data tidak tersimpan | Cek koneksi internet dari backend ke Supabase |
+| Supabase free tier limit | Supabase gratis mendukung 500MB database — cukup untuk project ini |
+
+---
+
+## 13. FAQ
+
+**Q: Berapa biaya pakai Hermes?**
+A: Gratis. Backend jalan di PC kamu, database pakai Supabase free tier (500MB), agent cuma 10MB binary.
+
+**Q: Berapa banyak server yang bisa dipantau?**
+A: Tidak ada batas. Satu backend bisa terima data dari puluhan server sekaligus.
+
+**Q: Apakah Hermes bisa hapus file sendiri?**
+A: Tidak. Hermes hanya memberi rekomendasi. Penghapusan butuh persetujuan kamu. File juga masuk "tempat sampah" dulu — masih bisa dipulihkan dalam 48 jam.
+
+**Q: Apakah aman?**
+A: Ya. Koneksi ke database pakai enkripsi (SSL). API key random 128 karakter hex, tidak bisa ditebak. File `.env` tidak di-commit ke Git.
+
+**Q: Bisa dipakai di Windows server?**
+A: Backend dan dashboard jalan di Windows. Agent saat ini hanya untuk Linux. Versi Windows menyusul.
+
+**Q: Server mati / restart, data hilang?**
+A: Tidak. Data tersimpan di Supabase (cloud). Saat server hidup lagi, agent langsung kirim data baru.
+
+**Q: Ganti password database Supabase?**
+A: Buka Supabase Dashboard → Settings → Database → Reset Database Password → update di file `.env` → restart backend.
+
+**Q: Mau deploy ke production (24 jam online)?**
+A: Backend + dashboard pindah ke VPS (DigitalOcean, AWS, dll). Ganti `HERMES_BACKEND_URL` di semua agent ke IP VPS. Dashboard bisa di-host di Vercel gratis.
+
+---
+
+## Struktur File
+
+```
+proyek_besar/
+├── agent/                  # Program agent (dipasang di server Linux)
+│   ├── hermes-agent        # Binary Linux (build dengan GOOS=linux)
+│   └── cmd/agent/main.go   # Kode sumber
+├── backend/                # Program backend (jalan di Windows)
+│   ├── hermes-backend.exe  # Binary Windows
+│   └── internal/           # Kode sumber (handlers, db, dsb)
+├── dashboard/              # Website monitoring
+│   └── app/page.tsx        # Halaman utama
+├── deploy/                 # File deploy untuk server tujuan
+│   └── ubuntu-vm/          # Contoh untuk Ubuntu VM
+│       ├── .env            # Konfigurasi untuk server itu
+│       └── DEPLOY.md       # Panduan deploy
+├── docs/agent.md           # Dokumentasi teknis untuk developer
+├── .env                    # Konfigurasi rahasia (JANGAN dibagikan!)
+├── .gitignore              # File yang tidak di-commit ke Git
+├── start.bat               # Jalankan semua service
+├── stop.bat                # Matikan semua service
+└── README.md               # Ringkasan project
+```

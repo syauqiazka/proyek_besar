@@ -47,7 +47,13 @@ type CleanupRequest struct {
 // GetServers — daftar semua server + snapshot terakhir (untuk dashboard)
 func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 	rows, err := h.db.DB.Query(`
-		SELECT s.id, s.hostname, s.status, s.last_seen_at,
+		SELECT s.id, s.hostname,
+		       CASE
+		           WHEN s.last_seen_at IS NULL THEN 'unknown'
+		           WHEN s.last_seen_at < NOW() - INTERVAL '5 minutes' THEN 'offline'
+		           ELSE s.status
+		       END AS status,
+		       s.last_seen_at,
 		       COALESCE(ss.used_percent, 0) AS used_percent,
 		       COALESCE(ss.total_bytes, 0) AS total_bytes,
 		       COALESCE(ss.used_bytes, 0) AS used_bytes,

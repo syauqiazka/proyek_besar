@@ -2,9 +2,8 @@ package backup
 
 import (
 	"errors"
+	"fmt"
 	"time"
-
-	"github.com/gofiber/fiber/v2"
 )
 
 type BackupService struct {

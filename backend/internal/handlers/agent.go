@@ -4,6 +4,13 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -21,7 +28,7 @@ func NewAgentHandler(database *db.DatabaseService) *AgentHandler {
 type RegisterRequest struct {
 	Hostname  string `json:"hostname"`
 	IPAddress string `json:"ip_address"`
-	TenantID  string `json:"tenant_id"`
+	TenantID  string `json:"tenant_id,omitempty"`
 }
 
 type MetricsRequest struct {
@@ -59,8 +66,11 @@ func (h *AgentHandler) Register(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
-	if req.Hostname == "" || req.TenantID == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "hostname and tenant_id are required"})
+	if req.Hostname == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "hostname is required"})
+	}
+	if req.TenantID == "" {
+		req.TenantID = "b39f9091-eb31-4c18-b77c-d08ced5c8fb1"
 	}
 
 	// Validasi tenant ada
@@ -70,7 +80,13 @@ func (h *AgentHandler) Register(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
 	}
 	if !tenantExists {
-		return c.Status(404).JSON(fiber.Map{"error": "tenant_id not found"})
+		var firstTenantID string
+		_ = h.db.DB.QueryRow("SELECT id FROM tenants LIMIT 1").Scan(&firstTenantID)
+		if firstTenantID != "" {
+			req.TenantID = firstTenantID
+		} else {
+			return c.Status(404).JSON(fiber.Map{"error": "tenant_id not found"})
+		}
 	}
 
 	// Insert server — pakai ON CONFLICT supaya idempotent (hostname unik per tenant).
@@ -105,11 +121,161 @@ func (h *AgentHandler) Register(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to create API key", "detail": err.Error()})
 	}
 
+	// Generate deploy package folder deploy/<hostname>/ berisi .env dan hermes-agent.env
+	deployPath, _ := createDeployPackage(req.Hostname, serverID, apiKey)
+
 	return c.Status(201).JSON(fiber.Map{
-		"server_id": serverID,
-		"api_key":   apiKey,
-		"message":   "Agent registered successfully",
+		"server_id":   serverID,
+		"api_key":     apiKey,
+		"deploy_path": deployPath,
+		"message":     "Agent registered successfully",
 	})
+}
+
+func createDeployPackage(hostname, serverID, apiKey string) (string, error) {
+	// Cari direktori root proyek yang memiliki folder "deploy"
+	// Mulai dari executable location, naik ke parent jika perlu
+	exePath, _ := os.Executable()
+	exeDir := filepath.Dir(exePath)
+
+	candidateDirs := []string{
+		".",
+		"..",
+		"../..",
+		"../../..",
+		exeDir,
+		filepath.Join(exeDir, ".."),
+		filepath.Join(exeDir, "../.."),
+		filepath.Join(exeDir, "../../.."),
+		filepath.Join(os.Getenv("USERPROFILE"), "Documents", "M.SyauqiAzka", "proyek_besar"),
+	}
+
+	var rootDir string
+	for _, dir := range candidateDirs {
+		abs, err := filepath.Abs(dir)
+		if err != nil {
+			continue
+		}
+		deployCheck := filepath.Join(abs, "deploy")
+		if info, err := os.Stat(deployCheck); err == nil && info.IsDir() {
+			// Konfirmasi ini root proyek dengan cek ada folder agent atau backend
+			if _, e2 := os.Stat(filepath.Join(abs, "agent")); e2 == nil {
+				rootDir = abs
+				break
+			}
+			if _, e2 := os.Stat(filepath.Join(abs, "backend")); e2 == nil {
+				rootDir = abs
+				break
+			}
+		}
+	}
+	if rootDir == "" {
+		// fallback: gunakan direktori yang paling mungkin
+		for _, dir := range candidateDirs {
+			abs, err := filepath.Abs(dir)
+			if err != nil {
+				continue
+			}
+			deployCheck := filepath.Join(abs, "deploy")
+			if info, err := os.Stat(deployCheck); err == nil && info.IsDir() {
+				rootDir = abs
+				break
+			}
+		}
+	}
+	if rootDir == "" {
+		rootDir = "."
+	}
+
+	deployDir := filepath.Join(rootDir, "deploy", hostname)
+	log.Printf("[Register] Creating deploy directory at: %s", deployDir)
+	if err := os.MkdirAll(deployDir, 0755); err != nil {
+		log.Printf("[Register] ERROR creating directory %s: %v", deployDir, err)
+		return "", err
+	}
+
+	backendURL := os.Getenv("HERMES_BACKEND_URL")
+	if backendURL == "" {
+		// Auto-detect LAN IP agar agent bisa konek dari server lain
+		localIP := getLocalIP()
+		backendURL = fmt.Sprintf("http://%s:3001/api/v1", localIP)
+	}
+	// Hilangkan trailing /api/v1 kalau sudah ada di env
+	backendURL = strings.TrimSuffix(backendURL, "/api/v1")
+	backendURL = backendURL + "/api/v1"
+
+	envContent := fmt.Sprintf(`# Hermes Agent Configuration for: %s
+HERMES_SERVER_ID=%s
+HERMES_API_KEY=%s
+HERMES_BACKEND_URL=%s
+HERMES_SCAN_INTERVAL=*/5 * * * *
+HERMES_MOUNT_PATHS=/,/home
+`, hostname, serverID, apiKey, backendURL)
+
+	// Buat kedua file: .env dan hermes-agent.env agar kompatibel dengan tutorial & skrip
+	_ = os.WriteFile(filepath.Join(deployDir, ".env"), []byte(envContent), 0644)
+	_ = os.WriteFile(filepath.Join(deployDir, "hermes-agent.env"), []byte(envContent), 0644)
+
+	// Copy binary agent jika ada
+	agentSrc := filepath.Join(rootDir, "agent", "hermes-agent")
+	if info, err := os.Stat(agentSrc); err == nil && !info.IsDir() {
+		_ = copyFile(agentSrc, filepath.Join(deployDir, "hermes-agent"))
+	}
+
+	// Copy script helper linux jika ada
+	linuxSrc := filepath.Join(rootDir, "deploy", "linux")
+	scripts := []string{"start-agent.sh", "stop-agent.sh", "status-agent.sh", "install-agent-service.sh", "hermes-agent.service"}
+	for _, s := range scripts {
+		srcPath := filepath.Join(linuxSrc, s)
+		if info, err := os.Stat(srcPath); err == nil && !info.IsDir() {
+			_ = copyFile(srcPath, filepath.Join(deployDir, s))
+		}
+	}
+
+	return deployDir, nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+
+// getLocalIP mengembalikan IP LAN pertama yang ditemukan (bukan loopback)
+// Dipakai untuk mengisi HERMES_BACKEND_URL di file .env deploy package.
+func getLocalIP() string {
+	// Coba konek ke DNS publik untuk menentukan interface yang aktif
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err == nil {
+		defer conn.Close()
+		if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+			return addr.IP.String()
+		}
+	}
+
+	// Fallback: iterasi semua interface
+	addrs, err := net.InterfaceAddrs()
+	if err == nil {
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					return ipnet.IP.String()
+				}
+			}
+		}
+	}
+	return "localhost"
 }
 
 // authServer — validasi X-API-Key milik server_id

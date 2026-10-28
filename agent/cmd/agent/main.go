@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/joho/godotenv"
 	"github.com/hermes/agent/internal/config"
 	"github.com/hermes/agent/internal/reporter"
 	"github.com/hermes/agent/internal/scanner"
@@ -12,6 +13,9 @@ import (
 
 func main() {
 	fmt.Println("Hermes Agent starting...")
+
+	// Load .env file jika ada (di folder yang sama dengan binary)
+	_ = godotenv.Load()
 
 	// Load configuration
 	cfg, err := config.Load()

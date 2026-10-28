@@ -1,0 +1,24 @@
+[Unit]
+Description=Hermes Storage Monitor Backend
+After=network.target supabase.service
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hermes/backend
+ExecStart=/opt/hermes/backend/hermes-backend.exe
+Restart=on-failure
+RestartSec=5
+Environment=PATH=$PATH:/opt/hermes:/opt/hermes/bin
+Environment=DATABASE_URL=postgresql://postgres:***@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+Environment=PORT=3001
+# Run as www-data user for Supabase connectivity
+User=www-data
+# Keep running in background
+WorkingDirectory=/opt/hermes/backend
+# Logs
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

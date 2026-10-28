@@ -4,6 +4,8 @@ Hermes adalah sistem yang **mengawasi kapasitas penyimpanan (storage) server** s
 
 Dibuat khusus untuk UMKM, digital agency, dan pemilik toko online Indonesia yang **tidak punya tim IT khusus**.
 
+> **Baru pertama kali pakai?** Baca **[TUTORIAL.md](TUTORIAL.md)** — panduan lengkap langkah demi langkah dari nol sampai bisa.
+
 ---
 
 ## 1. Apa Itu Hermes? (Penjelasan Sederhana)
@@ -180,13 +182,31 @@ Daftar file sampah yang ditemukan (log lama, file sementara, dsb.) — beserta u
 
 ---
 
-## 8. Menambah Server Baru (Panduan Penting)
+## 9. Menambah Server Baru
 
-Setiap server yang mau dipantau perlu **satu Agent** yang dipasang di dalamnya. Agent untuk Linux, karena server biasanya pakai Linux.
+### Cara Mudah (1 langkah)
 
-### Langkah-langkah menambah server:
+Klik 2x `register-server.bat` → ketik nama server → selesai.
 
-**Langkah 1 — Register server di backend** (cukup sekali per server)
+```
+Masukkan nama server (misal: web-01): production-db
+IP backend (Enter untuk localhost:3001): [Enter]
+
+[1/3] Register "production-db" ke backend...
+[2/3] Generate file konfigurasi...
+[3/3] Siap deploy...
+
+ SERVER "production-db" BERHASIL DIDAFTARKAN!
+ File siap deploy di: deploy\production-db\
+```
+
+Folder `deploy\production-db\` berisi:
+- `hermes-agent` (binary Linux)
+- `.env` (konfigurasi dengan server_id + api_key otomatis)
+
+Tinggal kirim ke server tujuan.
+
+### Cara Manual (kalau mau lebih kontrol)
 
 Buka browser, buka halaman ini (ganti `<NAMA-SERVER>` misal `web-02`):
 
@@ -230,10 +250,15 @@ HERMES_MOUNT_PATHS=/,/var,/home
 **Langkah 4 — Jalankan agent**
 
 ```bash
+chmod +x hermes-agent
 ./hermes-agent
 ```
 
-Agent akan scan dan kirim laporan ke backend secara otomatis, berkala.
+> ⚠️ **Kalau muncul `Permission denied`** padahal sudah `chmod +x` (biasanya di VM/pod milik penyedia hosting):
+> ```bash
+> bash ~/hermes-agent
+> ```
+> Itu trik untuk filesystem yang melarang eksekusi langsung (`noexec`). Agent tetap jalan normal lewat bash.
 
 **Langkah 5 — Cek di dashboard**
 
@@ -241,6 +266,22 @@ Refresh http://localhost:3000 — server baru muncul di tabel.
 
 > 💡 Semakin banyak server, tinggal ulangi Langkah 1–4 dengan nama berbeda.
 > Satu backend + satu dashboard bisa menangani banyak server sekaligus.
+> Panduan deploy lengkap dengan troubleshooting ada di `deploy/ubuntu-vm/DEPLOY.md`.
+
+### Menjalankan agent di background (tetap jalan walau terminal ditutup)
+
+```bash
+cd ~ && nohup ./hermes-agent > agent.log 2>&1 &
+tail -f ~/agent.log    # lihat log
+pkill hermes-agent     # berhenti
+```
+
+### Verifikasi data masuk
+
+```bash
+curl http://localhost:3001/api/v1/servers
+```
+Server baru muncul dengan `used_percent` (persen pemakaian disk asli).
 
 ---
 

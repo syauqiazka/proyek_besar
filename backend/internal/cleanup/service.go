@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/gofiber/fiber/v2"
 )
 
 type CleanupService struct {
@@ -129,7 +127,8 @@ type CleanupFile struct {
 	RestoredAt     time.Time
 }
 
-// File candidate struct untuk referensi	type FileCandidate struct {
+// File candidate struct untuk referensi
+type FileCandidate struct {
 	ID          string
 	ServerID    string
 	Path        string

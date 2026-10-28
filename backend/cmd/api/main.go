@@ -70,9 +70,18 @@ func main() {
 	cleanupHandler := handlers.NewCleanupHandler(dbService)
 	api.Post("/cleanup-actions/:id/restore", cleanupHandler.RestoreFiles)
 
-	// Notification webhook
-	notifyHandler := handlers.NewNotificationHandler()
-	api.Post("/notifications/whatsapp/webhook", notifyHandler.WhatsAppWebhook)
+	// API Keys endpoints
+	apiKeyHandler := handlers.NewApiKeyHandler(dbService)
+	api.Get("/api-keys", apiKeyHandler.GetApiKeys)
+	api.Delete("/api-keys/:id", apiKeyHandler.DeleteApiKey)
+
+	// Settings endpoints
+	settingsHandler := handlers.NewSettingsHandler(dbService.GetDB())
+	api.Post("/settings/test-telegram", settingsHandler.TestTelegram)
+	api.Post("/settings/telegram/connect", settingsHandler.StartTelegramConnection)
+	api.Get("/settings/telegram/status", settingsHandler.GetTelegramConnectionStatus)
+	api.Post("/settings/notification", settingsHandler.SaveNotificationSettings)
+	api.Get("/settings/notification", settingsHandler.GetNotificationSettings)
 
 	// Start server
 	port := os.Getenv("PORT")
